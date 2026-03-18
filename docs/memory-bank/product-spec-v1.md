@@ -1,6 +1,6 @@
 # Product Specification V1
 
-Last updated: 2026-03-16
+Last updated: 2026-03-18
 
 ## Product Overview
 
@@ -29,6 +29,29 @@ A user should be able to:
 - Compare budget versus actual spending
 - Identify recurring payments and upcoming bills
 - View simple trend charts over time
+
+## Non-Functional Expectations
+
+- Dashboard load target: under 2 seconds for normal users
+- Secure authentication with JWT and strong password hashing
+- Responsive experience across desktop, tablet, and mobile
+- Accessibility support for keyboard navigation, labels, and contrast
+- Reliable financial operations with safe balance updates and backups
+
+## UI / UX Expectations
+
+- Clean, calm, finance-friendly visual style
+- Clarity over decoration
+- Fast data entry with minimal friction
+- Strong hierarchy for numbers and charts
+- Consistent use of summary cards, tables, charts, progress bars, tabs, toasts, and empty states
+
+## Technical Architecture Expectations
+
+- Frontend architecture should follow a modular React feature structure.
+- Backend architecture should define APIs, layers, repositories, migrations, and cross-cutting concerns clearly.
+- PostgreSQL schema should be treated as a first-class part of the implementation plan.
+- The final backend framework choice must be consistent with the documented architecture and stack.
 
 ## Persons
 

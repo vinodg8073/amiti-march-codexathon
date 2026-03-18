@@ -1,17 +1,16 @@
-package com.finance.tracker.transaction;
+package com.finance.tracker.recurring;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-public record Transaction(
+public record RecurringPayment(
         Long id,
-        String description,
+        String name,
         BigDecimal amount,
-        TransactionType type,
         String category,
         Long accountId,
         String accountName,
-        LocalDate transactionDate,
-        boolean recurring
+        RecurringFrequency frequency,
+        LocalDate nextDueDate
 ) {
 }

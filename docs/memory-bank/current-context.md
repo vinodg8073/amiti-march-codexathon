@@ -1,24 +1,78 @@
 # Current Context
 
-Last updated: 2026-03-16
+Last updated: 2026-03-18
 
 ## Current Understanding
 
-- The repository is in an early stage with a root `README.md`, a `week-1` delivery folder, and a shared memory-bank folder.
-- A shared memory bank is needed for ongoing collaboration.
-- The memory bank should track goals, product scope, and the latest agreed context.
-- Version 1 is now defined as a Personal Finance Tracker web application.
-- Implementation has started with a React web app scaffold and a Spring Boot API scaffold under `week-1`.
-- The current API uses seeded in-memory transaction data as a temporary foundation before PostgreSQL persistence is added.
+- The repository contains a `week-1` delivery folder and a shared memory-bank folder.
+- Version 1 is defined as a Personal Finance Tracker web application.
+- Week 1 now includes end-to-end in-memory flows for authentication, transactions, budgeting, reporting, savings goals, and recurring payments.
+- The React web app stores the session token in the browser so a logged-in user stays signed in between reloads while the API remains running.
+- The Spring Boot API keeps each user's finance workspace in memory, which is suitable for prototyping but not for persistence.
+- The V1 information architecture now includes a main navigation model: Dashboard, Transactions, Categories, Budgets, Goals, Reports, Recurring, Accounts, and Settings.
+- The Dashboard definition is now more detailed and includes required widgets for summary, budgets, charts, transactions, recurring items, and savings goals.
+- The Dashboard also includes key shortcut actions: Add Transaction, View All Transactions, Create Budget, Add Recurring Bill, and Update Goal Contribution.
+- The Transactions module now includes low-level fields, user-facing features such as filtering, search, bulk actions, and list loading, plus edge-case behavior for negative inputs, back-dated entries, and transfers across two accounts.
+- The Categories module now defines default income and expense categories, category customization, archiving, and type separation.
+- The Budgets module now defines budget fields, monthly category budgets, threshold alerts at 80%, 100%, and 120%, plus duplicate-last-month support.
+- The Goals module now defines goal fields, optional linked accounts, contribution and withdrawal actions, progress tracking, and completed status.
+- The Reports module now defines report types, report filters, and export options for CSV and PDF.
+- The Recurring module now defines recurring transaction fields, frequency options, scheduled auto-generation, next-run tracking, and pause/delete behavior.
+- The Accounts module now defines account types, account fields, balance visibility, and transfer support between accounts.
+- Validation rules are now explicitly captured for transactions, budgets, and goals, and should be enforced in both frontend forms and backend validation.
+- Notifications and alerts are now explicitly captured, including budget threshold alerts, budget exceeded, upcoming recurring payments, goal reached, and transaction success feedback.
+- Notification channels in V1 are in-app toasts and in-app alert banners.
+- Empty states and error states are now explicitly captured, including first-use CTAs, no-data guidance, API failures, session expiration, validation errors, and report-fetch failures.
+- Non-functional requirements are now explicitly captured and should guide implementation: performance, security, reliability, accessibility, and responsiveness.
+- UI / UX design system requirements are now explicitly captured, including visual style, component expectations, detailed flows, notification behavior, empty states, and error states.
+- Frontend architecture guidance is now explicitly captured, including a feature-oriented React structure, recommended libraries, and an explicit split between server state and local UI state.
+- Server state should use TanStack Query for transactions, budgets, dashboard summary, goals, and reports.
+- Local UI state should use Zustand or component state for modal visibility, filters, selected date range, and table sorting.
+- Backend architecture guidance is now explicitly captured, including API endpoints, PostgreSQL schema, Spring-aligned layers, repositories, migrations, cross-cutting concerns, and security boundaries.
+- The backend architecture is now aligned to the Spring Boot direction and no longer references EF Core.
+- Security and permissions are now explicitly defined: single-user ownership, backend query scoping by authenticated `userId`, JWT access tokens, refresh tokens, secure password hashing, HTTPS-first deployment behavior, and audit logs for key money-impacting actions.
+- Acceptance criteria are now explicitly captured for Dashboard, Transactions, Budgets, Goals, and Reports so they can be used later as a functional definition of done.
+- High-level and low-level design documents are now captured to guide both system design and implementation-level structure.
+- The current recommended technical direction is a modular monolith for V1, with clean module boundaries that allow later evolution toward microservices if needed.
+- Implementation roadmap and repo scaffolding guidance are now captured to support actual build sequencing and starter project structure.
+- Platform options are now explicitly captured for Docker or Podman, Kubernetes plus Helm, Grafana-based observability, Keycloak or app-managed identity, and future deployment to Azure, AWS, or other platforms.
+- Future enhancements are now captured separately so they stay visible without expanding current V1 scope: bank sync, receipt scanning, AI categorization suggestions, shared household budgets, mobile app, push notifications, and multi-currency support.
+- The global authenticated shell should also support secondary utilities: Add Transaction, Search, Date Range Picker, Notifications, and User Profile Menu.
+- Authentication now has a more detailed V1 scope including display name, forgot password, reset password, JWT-based authentication, refresh token support, and stronger validation rules.
+- The current authentication implementation is still a prototype and does not yet satisfy the new JWT and password-recovery requirements.
 
 ## Working Agreement
 
-- The agent should update this memory bank as part of future work when goals or shared understanding change.
+- The agent should update this memory bank as goals or shared understanding change.
 - Version-specific scope should be captured in a product-spec document.
-- Goals should remain visible and easy to revise as the project becomes more defined.
+- Navigation and screen structure should be captured in an information architecture document.
+- Focused feature areas such as authentication can be captured in dedicated spec documents.
+- Implementation constraints should be captured in non-functional requirements and treated as build requirements.
+- UI / UX rules and interaction flows should be captured in the design-system document and treated as implementation guidance.
+- Frontend code organization and library decisions should be captured in the frontend architecture document.
+- Backend API, schema, and layer decisions should be captured in the backend architecture document.
+- Validation rules should be captured explicitly and enforced in both frontend and backend layers.
+- Delivery folders such as `week-1` should reflect implemented slices of work.
+- Security boundaries should be treated as architecture rules, especially user-scoped data access and auditability for money-impacting actions.
+- Acceptance criteria should be treated as the working functional definition of done until detailed test cases are created.
+- Future enhancements should be tracked separately from active V1 commitments unless they are explicitly promoted into scope.
+- High-level and low-level design docs should be used as the primary reference when moving from requirements into code structure.
+- Roadmap and scaffolding docs should guide implementation sequencing before major code generation begins.
 
 ## Open Questions
 
-- What features are in scope for the first implementation milestone after the product spec?
-- Should authentication be email/password only in V1, or should social login also be considered later?
-- Should the next implementation slice focus on authentication, PostgreSQL persistence, or budgeting features first?
+- Should display name appear in the top header, profile menu, or both?
+- Should forgot-password and reset-password be part of week 1, or should they be scheduled for the next slice with email infrastructure?
+- Should week 2 focus first on JWT plus refresh tokens or PostgreSQL persistence?
+- Should the Dashboard use cards plus chart grid, or a more analytics-heavy layout with a wider reporting area?
+- Should `tags` be stored as free text labels, or normalized into a separate tag model later?
+- Should transaction lists use classic pagination first or infinite scroll first in the initial implementation?
+- Should Categories be its own visible navigation item or remain managed within Transactions and Settings flows?
+- Should `currentBalance` be stored directly, derived from transactions, or supported by both strategies?
+- Should `alertThresholdPercent` allow multiple configured thresholds later, or stay single-field with default milestone alerts?
+- Should goal withdrawals create related transactions automatically when a goal is linked to an account?
+- Should paused recurring items retain their `nextRunDate`, or recalculate it when resumed?
+- Should PDF export be generated server-side, client-side, or support both in later phases?
+- Should the frontend start with TypeScript immediately or phase it in after the initial feature structure is stable?
+- When production deployment begins, should the first target environment be Azure, AWS, or a lighter platform for early rollout?
+- Should identity stay app-managed for V1, or should Keycloak be introduced before production hardening?

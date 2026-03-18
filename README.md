@@ -3,15 +3,27 @@ Coding marathon to explore the new way of building software by collaborating wit
 
 ## Project Structure
 
-- `week-1/personal-finance-web/`: React + Vite client for the Personal Finance Tracker UI
-- `week-1/personal-finance-api/`: Spring Boot API for transactions and dashboard data
+- `week-1/personal-finance-web/`: React + Vite web app for authentication, transactions, budgets, reporting, goals, and recurring payments
+- `week-1/personal-finance-api/`: Spring Boot API serving authenticated finance workflows with in-memory user workspaces
 - `docs/memory-bank/`: shared product goals, V1 scope, and working context
 
-## Current V1 Implementation
+## Week 1 Scope Implemented
 
-- A React dashboard scaffold with summary cards, quick transaction entry, category breakdown, recurring bills, and recent transaction history
-- A Spring Boot API scaffold with `GET /api/dashboard`, `GET /api/transactions`, and `POST /api/transactions`
-- Seed sample data in the API so the UI has realistic starter content
+- Authentication: sign up, log in, restore signed-in session, and log out
+- Transactions: add, edit, delete, categorize, and tag by account
+- Budgeting: set monthly budgets by category and review over/under status
+- Reporting: review spending trends and top spending categories
+- Goals: create savings goals and add progress contributions
+- Recurring Payments: create recurring bills and view upcoming expenses
+
+## End-to-End Flow
+
+1. Start the API.
+2. Start the web app.
+3. Sign up with email and password.
+4. Add accounts, transactions, budgets, goals, and recurring payments.
+5. Review reporting and budget status on the dashboard.
+6. Log out and back in to restore the active in-memory session token in the browser.
 
 ## Local Startup
 
@@ -32,11 +44,11 @@ npm run dev
 
 The web app proxies `/api` requests to `http://localhost:8080`.
 
-## Next Steps
+## Current Limitations
 
-- Replace the in-memory transaction service with PostgreSQL-backed persistence
-- Add authentication and user accounts
-- Add budget, savings-goal, and trend-chart modules
+- Data is stored in memory, so restarting the API resets users and finance data.
+- Authentication uses a simple session token prototype and is not production-ready.
+- PostgreSQL persistence and proper password hashing are still pending.
 
 ## Shared Project Memory
 

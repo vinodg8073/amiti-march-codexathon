@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-public record CreateTransactionRequest(
+public record UpdateTransactionRequest(
         @NotBlank String description,
         @NotNull @DecimalMin("0.01") BigDecimal amount,
         @NotNull TransactionType type,

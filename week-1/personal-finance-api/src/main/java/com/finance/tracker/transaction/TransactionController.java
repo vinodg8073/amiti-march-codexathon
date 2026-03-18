@@ -1,36 +1,57 @@
 package com.finance.tracker.transaction;
 
-import com.finance.tracker.dashboard.DashboardSummary;
+import com.finance.tracker.finance.FinanceWorkspaceService;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/transactions")
 public class TransactionController {
-    private final TransactionService transactionService;
+    private final FinanceWorkspaceService financeWorkspaceService;
 
-    public TransactionController(TransactionService transactionService) {
-        this.transactionService = transactionService;
+    public TransactionController(FinanceWorkspaceService financeWorkspaceService) {
+        this.financeWorkspaceService = financeWorkspaceService;
     }
 
-    @GetMapping("/transactions")
-    public List<Transaction> getTransactions() {
-        return transactionService.findAll();
+    @GetMapping
+    public List<Transaction> getTransactions(
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader
+    ) {
+        return financeWorkspaceService.getTransactions(authorizationHeader);
     }
 
-    @PostMapping("/transactions")
-    public Transaction createTransaction(@Valid @RequestBody CreateTransactionRequest request) {
-        return transactionService.create(request);
+    @PostMapping
+    public Transaction createTransaction(
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+            @Valid @RequestBody CreateTransactionRequest request
+    ) {
+        return financeWorkspaceService.createTransaction(authorizationHeader, request);
     }
 
-    @GetMapping("/dashboard")
-    public DashboardSummary getDashboard() {
-        return transactionService.buildDashboardSummary();
+    @PutMapping("/{transactionId}")
+    public Transaction updateTransaction(
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+            @PathVariable Long transactionId,
+            @Valid @RequestBody UpdateTransactionRequest request
+    ) {
+        return financeWorkspaceService.updateTransaction(authorizationHeader, transactionId, request);
+    }
+
+    @DeleteMapping("/{transactionId}")
+    public void deleteTransaction(
+            @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+            @PathVariable Long transactionId
+    ) {
+        financeWorkspaceService.deleteTransaction(authorizationHeader, transactionId);
     }
 }
