@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   font-family: "Manrope", sans-serif;
   color: #17324d;
   background:
@@ -217,6 +217,70 @@ button {
   padding: 28px;
 }
 
+.auth-card-login {
+  width: min(100%, 620px);
+  padding: 32px 36px;
+  background: #ffffff;
+  border: 1px solid rgba(23, 50, 77, 0.14);
+  box-shadow: 0 20px 44px rgba(23, 50, 77, 0.08);
+  border-radius: 0;
+}
+
+.auth-product-title {
+  font-size: clamp(1.8rem, 3vw, 2.3rem);
+  line-height: 1.1;
+  margin-bottom: 18px;
+}
+
+.auth-divider {
+  height: 1px;
+  background: #d4deea;
+  margin-bottom: 24px;
+}
+
+.auth-section-copy h2 {
+  margin-bottom: 18px;
+  font-size: 1.5rem;
+}
+
+.auth-primary-action {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.auth-primary-action button {
+  min-width: 140px;
+}
+
+.auth-links {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.auth-inline-link {
+  margin-bottom: 0;
+  color: #36526d;
+}
+
+.text-link-button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #17324d;
+  font-weight: 600;
+  text-align: left;
+}
+
+.text-link-button.inline {
+  display: inline;
+}
+
+.auth-status {
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
 .auth-form {
   display: grid;
   gap: 14px;
@@ -357,3 +421,5 @@ small {
     padding-inline: 14px;
   }
 }
+
+

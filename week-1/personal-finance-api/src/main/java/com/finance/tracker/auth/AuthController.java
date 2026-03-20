@@ -1,6 +1,5 @@
 package com.finance.tracker.auth;
 
-import com.finance.tracker.finance.FinanceWorkspaceService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,24 +15,24 @@ import static com.finance.tracker.auth.AuthModels.SignupRequest;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
-    private final FinanceWorkspaceService financeWorkspaceService;
+    private final AuthService authService;
 
-    public AuthController(FinanceWorkspaceService financeWorkspaceService) {
-        this.financeWorkspaceService = financeWorkspaceService;
+    public AuthController(AuthService authService) {
+        this.authService = authService;
     }
 
     @PostMapping("/signup")
     public AuthResponse signup(@Valid @RequestBody SignupRequest request) {
-        return financeWorkspaceService.signup(request);
+        return authService.signup(request);
     }
 
     @PostMapping("/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest request) {
-        return financeWorkspaceService.login(request);
+        return authService.login(request);
     }
 
     @GetMapping("/me")
     public AuthResponse me(@RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
-        return financeWorkspaceService.getSession(authorizationHeader);
+        return authService.getSession(authorizationHeader);
     }
 }
