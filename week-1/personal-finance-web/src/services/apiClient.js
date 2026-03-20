@@ -1,10 +1,14 @@
 const AUTH_TOKEN_KEY = "personal-finance-token";
+const REFRESH_TOKEN_KEY = "personal-finance-refresh-token";
 
-async function request(path, { token, method = "GET", body } = {}) {
+let refreshInFlight = null;
+
+async function request(path, { token, method = "GET", body, retryOnUnauthorized = true } = {}) {
   const headers = {};
+  const effectiveToken = getStoredToken() || token;
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  if (effectiveToken) {
+    headers.Authorization = `Bearer ${effectiveToken}`;
   }
 
   if (body !== undefined) {
@@ -17,6 +21,13 @@ async function request(path, { token, method = "GET", body } = {}) {
     body: body === undefined ? undefined : JSON.stringify(body)
   });
 
+  if (response.status === 401 && retryOnUnauthorized && path !== "/api/auth/refresh") {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      return request(path, { token: refreshed, method, body, retryOnUnauthorized: false });
+    }
+  }
+
   const isJson = response.headers.get("content-type")?.includes("application/json");
   const payload = isJson ? await response.json() : null;
 
@@ -27,8 +38,57 @@ async function request(path, { token, method = "GET", body } = {}) {
   return payload;
 }
 
+async function refreshAccessToken() {
+  const refreshToken = getStoredRefreshToken();
+  if (!refreshToken) {
+    clearStoredToken();
+    return null;
+  }
+
+  if (!refreshInFlight) {
+    refreshInFlight = fetch("/api/auth/refresh", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ refreshToken })
+    })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.message || "Session refresh failed");
+        }
+        storeSessionTokens(payload);
+        return payload.token;
+      })
+      .catch(() => {
+        clearStoredToken();
+        return null;
+      })
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+
+  return refreshInFlight;
+}
+
 export function getStoredToken() {
   return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function getStoredRefreshToken() {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+export function storeSessionTokens(authResponse) {
+  if (authResponse?.token) {
+    localStorage.setItem(AUTH_TOKEN_KEY, authResponse.token);
+  }
+
+  if (authResponse?.refreshToken) {
+    localStorage.setItem(REFRESH_TOKEN_KEY, authResponse.refreshToken);
+  }
 }
 
 export function storeToken(token) {
@@ -37,14 +97,15 @@ export function storeToken(token) {
 
 export function clearStoredToken() {
   localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 export function signup(payload) {
-  return request("/api/auth/signup", { method: "POST", body: payload });
+  return request("/api/auth/signup", { method: "POST", body: payload, retryOnUnauthorized: false });
 }
 
 export function login(payload) {
-  return request("/api/auth/login", { method: "POST", body: payload });
+  return request("/api/auth/login", { method: "POST", body: payload, retryOnUnauthorized: false });
 }
 
 export function fetchSession(token) {

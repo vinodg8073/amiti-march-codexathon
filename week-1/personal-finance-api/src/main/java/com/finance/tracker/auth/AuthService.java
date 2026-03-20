@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 
 import static com.finance.tracker.auth.AuthModels.AuthResponse;
 import static com.finance.tracker.auth.AuthModels.LoginRequest;
+import static com.finance.tracker.auth.AuthModels.RefreshTokenRequest;
 import static com.finance.tracker.auth.AuthModels.SignupRequest;
 
 @Service
@@ -21,6 +22,10 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest request) {
         return financeWorkspaceService.login(request);
+    }
+
+    public AuthResponse refresh(RefreshTokenRequest request) {
+        return financeWorkspaceService.refresh(request);
     }
 
     public AuthResponse getSession(String authorizationHeader) {

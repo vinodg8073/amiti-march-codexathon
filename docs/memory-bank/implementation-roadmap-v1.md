@@ -8,7 +8,8 @@ Define a practical execution roadmap for building version 1 of the Personal Fina
 
 ## Delivery Strategy
 
-- Build V1 as a modular monolith.
+- Build V1 with a primary business API plus a lightweight support microservice for document and notification workflows.
+- Keep each service modular internally and avoid premature domain fragmentation beyond the two-service split.
 - Deliver in vertical slices where each phase produces a testable outcome.
 - Prioritize security and data integrity before analytics and platform hardening.
 

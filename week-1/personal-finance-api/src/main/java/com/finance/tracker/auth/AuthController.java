@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import static com.finance.tracker.auth.AuthModels.AuthResponse;
 import static com.finance.tracker.auth.AuthModels.LoginRequest;
+import static com.finance.tracker.auth.AuthModels.RefreshTokenRequest;
 import static com.finance.tracker.auth.AuthModels.SignupRequest;
 
 @RestController
@@ -29,6 +30,11 @@ public class AuthController {
     @PostMapping("/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    @PostMapping("/refresh")
+    public AuthResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return authService.refresh(request);
     }
 
     @GetMapping("/me")

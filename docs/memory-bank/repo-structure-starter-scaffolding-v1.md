@@ -4,7 +4,7 @@ Last updated: 2026-03-18
 
 ## Objective
 
-Define the recommended repository structure and starter scaffolding layout for implementing the Personal Finance Tracker as a modular monolith with separate web and API applications.
+Define the recommended repository structure and starter scaffolding layout for implementing the Personal Finance Tracker with a web application, a primary business API, and a lightweight support microservice.
 
 ## Top-Level Repository Structure
 
@@ -15,6 +15,7 @@ Define the recommended repository structure and starter scaffolding layout for i
   /week-1
     /personal-finance-web
     /personal-finance-api
+    /personal-finance-support-api
   /.github
     /workflows
   /.devcontainer
@@ -28,7 +29,8 @@ Define the recommended repository structure and starter scaffolding layout for i
 
 - `docs/memory-bank`: living product, design, architecture, roadmap, and planning documents
 - `week-1/personal-finance-web`: React web application
-- `week-1/personal-finance-api`: Spring Boot backend API
+- `week-1/personal-finance-api`: Spring Boot business API
+- `week-1/personal-finance-support-api`: Spring Boot support API for notifications and PDF/export workflows
 - `.github/workflows`: CI workflows
 - `.devcontainer`: optional development-container setup
 - `.infra`: local deployment assets such as compose files, dashboards, sample configs, and later Helm charts
@@ -100,7 +102,7 @@ Define the recommended repository structure and starter scaffolding layout for i
   AlertBanner.tsx
 ```
 
-## Recommended API Scaffolding
+## Recommended Business API Scaffolding
 
 ```text
 /week-1/personal-finance-api
@@ -240,3 +242,24 @@ Define the recommended repository structure and starter scaffolding layout for i
 - add `notifications` and `exports` submodules when those become more complex
 - add Helm chart assets only when deployment maturity justifies them
 - add separate worker process only when recurring jobs or exports need isolation
+
+
+## Recommended Support API Scaffolding
+
+```text
+/week-1/personal-finance-support-api
+  /src/main/java/com/personalfinance/support
+    /config
+    /common
+    /document
+    /notification
+    /health
+  /src/main/resources
+    application.yml
+  /src/test
+  /pom.xml
+```
+
+## Updated Organization Rule
+
+- use two services only where there is a clear operational boundary: business workflows in the main API and async/support workflows in the support API

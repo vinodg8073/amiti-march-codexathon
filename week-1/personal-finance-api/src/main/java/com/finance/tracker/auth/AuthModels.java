@@ -22,9 +22,12 @@ public final class AuthModels {
     ) {
     }
 
+    public record RefreshTokenRequest(@NotBlank String refreshToken) {
+    }
+
     public record UserView(Long id, String email, String displayName) {
     }
 
-    public record AuthResponse(String token, UserView user) {
+    public record AuthResponse(String token, String refreshToken, UserView user) {
     }
 }

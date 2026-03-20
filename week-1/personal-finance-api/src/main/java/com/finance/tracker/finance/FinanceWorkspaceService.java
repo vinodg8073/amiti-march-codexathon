@@ -5,8 +5,10 @@ import com.finance.tracker.account.AccountType;
 import com.finance.tracker.account.CreateAccountRequest;
 import com.finance.tracker.auth.AuthModels.AuthResponse;
 import com.finance.tracker.auth.AuthModels.LoginRequest;
+import com.finance.tracker.auth.AuthModels.RefreshTokenRequest;
 import com.finance.tracker.auth.AuthModels.SignupRequest;
 import com.finance.tracker.auth.AuthModels.UserView;
+import com.finance.tracker.auth.JwtTokenService;
 import com.finance.tracker.budget.Budget;
 import com.finance.tracker.budget.BudgetStatus;
 import com.finance.tracker.budget.UpsertBudgetRequest;
@@ -22,6 +24,7 @@ import com.finance.tracker.transaction.CreateTransactionRequest;
 import com.finance.tracker.transaction.Transaction;
 import com.finance.tracker.transaction.TransactionType;
 import com.finance.tracker.transaction.UpdateTransactionRequest;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -34,15 +37,22 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class FinanceWorkspaceService {
     private final AtomicLong userIdSequence = new AtomicLong(1);
     private final Map<String, UserRecord> usersByEmail = new HashMap<>();
-    private final Map<String, Long> sessionsByToken = new HashMap<>();
+    private final Map<Long, UserRecord> usersById = new HashMap<>();
+    private final Map<String, Long> refreshTokensByToken = new HashMap<>();
     private final Map<Long, UserWorkspace> workspacesByUserId = new HashMap<>();
+    private final PasswordEncoder passwordEncoder;
+    private final JwtTokenService jwtTokenService;
+
+    public FinanceWorkspaceService(PasswordEncoder passwordEncoder, JwtTokenService jwtTokenService) {
+        this.passwordEncoder = passwordEncoder;
+        this.jwtTokenService = jwtTokenService;
+    }
 
     public synchronized AuthResponse signup(SignupRequest request) {
         String email = request.email().trim().toLowerCase();
@@ -51,27 +61,45 @@ public class FinanceWorkspaceService {
         }
 
         long userId = userIdSequence.getAndIncrement();
-        UserRecord userRecord = new UserRecord(userId, email, request.password(), request.displayName().trim());
+        UserRecord userRecord = new UserRecord(
+                userId,
+                email,
+                passwordEncoder.encode(request.password()),
+                request.displayName().trim()
+        );
         usersByEmail.put(email, userRecord);
+        usersById.put(userId, userRecord);
         workspacesByUserId.put(userId, seedWorkspace());
 
-        return createSession(userRecord);
+        return issueAuthResponse(userRecord, true);
     }
 
     public synchronized AuthResponse login(LoginRequest request) {
         String email = request.email().trim().toLowerCase();
         UserRecord userRecord = usersByEmail.get(email);
-        if (userRecord == null || !userRecord.password().equals(request.password())) {
+        if (userRecord == null || !passwordEncoder.matches(request.password(), userRecord.passwordHash())) {
             throw new IllegalArgumentException("Invalid email or password.");
         }
 
-        return createSession(userRecord);
+        return issueAuthResponse(userRecord, true);
+    }
+
+    public synchronized AuthResponse refresh(RefreshTokenRequest request) {
+        JwtTokenService.TokenClaims claims = jwtTokenService.parseRefreshToken(request.refreshToken());
+        Long userId = refreshTokensByToken.get(request.refreshToken());
+        if (userId == null || !userId.equals(claims.userId())) {
+            throw new UnauthorizedException("Refresh token is invalid or expired.");
+        }
+
+        refreshTokensByToken.remove(request.refreshToken());
+        UserRecord userRecord = findUserById(claims.userId());
+        return issueAuthResponse(userRecord, true);
     }
 
     public synchronized AuthResponse getSession(String authorizationHeader) {
         UserRecord userRecord = requireUser(authorizationHeader);
-        String token = extractToken(authorizationHeader);
-        return new AuthResponse(token, new UserView(userRecord.id(), userRecord.email(), userRecord.displayName()));
+        String token = extractBearerToken(authorizationHeader);
+        return new AuthResponse(token, null, toUserView(userRecord));
     }
 
     public synchronized List<Account> getAccounts(String authorizationHeader) {
@@ -109,11 +137,7 @@ public class FinanceWorkspaceService {
         return transaction;
     }
 
-    public synchronized Transaction updateTransaction(
-            String authorizationHeader,
-            Long transactionId,
-            UpdateTransactionRequest request
-    ) {
+    public synchronized Transaction updateTransaction(String authorizationHeader, Long transactionId, UpdateTransactionRequest request) {
         UserWorkspace workspace = workspaceFor(authorizationHeader);
         Account account = findAccount(workspace, request.accountId());
 
@@ -165,12 +189,7 @@ public class FinanceWorkspaceService {
             }
         }
 
-        Budget budget = new Budget(
-                workspace.budgetIdSequence.getAndIncrement(),
-                request.category(),
-                request.month(),
-                request.limitAmount()
-        );
+        Budget budget = new Budget(workspace.budgetIdSequence.getAndIncrement(), request.category(), request.month(), request.limitAmount());
         workspace.budgets.add(budget);
         return toBudgetStatus(budget, calculateSpentForCategory(workspace, request.category(), request.month()));
     }
@@ -192,11 +211,7 @@ public class FinanceWorkspaceService {
         return goal;
     }
 
-    public synchronized SavingsGoal addGoalContribution(
-            String authorizationHeader,
-            Long goalId,
-            UpdateGoalProgressRequest request
-    ) {
+    public synchronized SavingsGoal addGoalContribution(String authorizationHeader, Long goalId, UpdateGoalProgressRequest request) {
         UserWorkspace workspace = workspaceFor(authorizationHeader);
 
         for (int index = 0; index < workspace.goals.size(); index++) {
@@ -223,10 +238,7 @@ public class FinanceWorkspaceService {
                 .toList();
     }
 
-    public synchronized RecurringPayment createRecurringPayment(
-            String authorizationHeader,
-            CreateRecurringPaymentRequest request
-    ) {
+    public synchronized RecurringPayment createRecurringPayment(String authorizationHeader, CreateRecurringPaymentRequest request) {
         UserWorkspace workspace = workspaceFor(authorizationHeader);
         Account account = findAccount(workspace, request.accountId());
         RecurringPayment recurringPayment = new RecurringPayment(
@@ -291,26 +303,37 @@ public class FinanceWorkspaceService {
         );
     }
 
-    private AuthResponse createSession(UserRecord userRecord) {
-        String token = UUID.randomUUID().toString();
-        sessionsByToken.put(token, userRecord.id());
-        return new AuthResponse(token, new UserView(userRecord.id(), userRecord.email(), userRecord.displayName()));
+    private AuthResponse issueAuthResponse(UserRecord userRecord, boolean includeRefreshToken) {
+        String accessToken = jwtTokenService.createAccessToken(userRecord.id(), userRecord.email());
+        String refreshToken = null;
+
+        if (includeRefreshToken) {
+            refreshToken = jwtTokenService.createRefreshToken(userRecord.id(), userRecord.email());
+            refreshTokensByToken.put(refreshToken, userRecord.id());
+        }
+
+        return new AuthResponse(accessToken, refreshToken, toUserView(userRecord));
     }
 
     private UserRecord requireUser(String authorizationHeader) {
-        String token = extractToken(authorizationHeader);
-        Long userId = sessionsByToken.get(token);
-        if (userId == null) {
-            throw new UnauthorizedException("Please log in to continue.");
-        }
-
-        return usersByEmail.values().stream()
-                .filter(user -> user.id().equals(userId))
-                .findFirst()
-                .orElseThrow(() -> new UnauthorizedException("Session not found."));
+        String token = extractBearerToken(authorizationHeader);
+        Long userId = jwtTokenService.parseAccessToken(token).userId();
+        return findUserById(userId);
     }
 
-    private String extractToken(String authorizationHeader) {
+    private UserRecord findUserById(Long userId) {
+        UserRecord userRecord = usersById.get(userId);
+        if (userRecord == null) {
+            throw new UnauthorizedException("User not found.");
+        }
+        return userRecord;
+    }
+
+    private UserView toUserView(UserRecord userRecord) {
+        return new UserView(userRecord.id(), userRecord.email(), userRecord.displayName());
+    }
+
+    private String extractBearerToken(String authorizationHeader) {
         if (authorizationHeader == null || authorizationHeader.isBlank()) {
             throw new UnauthorizedException("Missing authorization token.");
         }
@@ -419,18 +442,8 @@ public class FinanceWorkspaceService {
         ));
 
         YearMonth activeMonth = YearMonth.now();
-        workspace.budgets.add(new Budget(
-                workspace.budgetIdSequence.getAndIncrement(),
-                "FOOD",
-                activeMonth.toString(),
-                new BigDecimal("600.00")
-        ));
-        workspace.budgets.add(new Budget(
-                workspace.budgetIdSequence.getAndIncrement(),
-                "HOUSING",
-                activeMonth.toString(),
-                new BigDecimal("2000.00")
-        ));
+        workspace.budgets.add(new Budget(workspace.budgetIdSequence.getAndIncrement(), "FOOD", activeMonth.toString(), new BigDecimal("600.00")));
+        workspace.budgets.add(new Budget(workspace.budgetIdSequence.getAndIncrement(), "HOUSING", activeMonth.toString(), new BigDecimal("2000.00")));
 
         workspace.goals.add(new SavingsGoal(
                 workspace.goalIdSequence.getAndIncrement(),
@@ -464,7 +477,7 @@ public class FinanceWorkspaceService {
         return workspace;
     }
 
-    private record UserRecord(Long id, String email, String password, String displayName) {
+    private record UserRecord(Long id, String email, String passwordHash, String displayName) {
     }
 
     private static final class UserWorkspace {
@@ -480,4 +493,3 @@ public class FinanceWorkspaceService {
         private final List<RecurringPayment> recurringPayments = new ArrayList<>();
     }
 }
-
