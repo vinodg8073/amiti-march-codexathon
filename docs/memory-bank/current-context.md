@@ -1,6 +1,6 @@
-# Current Context
+﻿# Current Context
 
-Last updated: 2026-03-18
+Last updated: 2026-03-20
 
 ## Current Understanding
 
@@ -33,15 +33,30 @@ Last updated: 2026-03-18
 - Security and permissions are now explicitly defined: single-user ownership, backend query scoping by authenticated `userId`, JWT access tokens, refresh tokens, secure password hashing, HTTPS-first deployment behavior, and audit logs for key money-impacting actions.
 - Acceptance criteria are now explicitly captured for Dashboard, Transactions, Budgets, Goals, and Reports so they can be used later as a functional definition of done.
 - High-level and low-level design documents are now captured to guide both system design and implementation-level structure.
-- The current recommended technical direction is a modular monolith for V1, with clean module boundaries that allow later evolution toward microservices if needed.
+- The current technical direction is now a pragmatic two-service baseline: a primary business API plus a lightweight support service for document-generation and notification workflows, while keeping each service modular internally.
 - Implementation roadmap and repo scaffolding guidance are now captured to support actual build sequencing and starter project structure.
 - Platform options are now explicitly captured for Docker or Podman, Kubernetes plus Helm, Grafana-based observability, Keycloak or app-managed identity, and future deployment to Azure, AWS, or other platforms.
 - Future enhancements are now captured separately so they stay visible without expanding current V1 scope: bank sync, receipt scanning, AI categorization suggestions, shared household budgets, mobile app, push notifications, and multi-currency support.
 - The global authenticated shell should also support secondary utilities: Add Transaction, Search, Date Range Picker, Notifications, and User Profile Menu.
 - Authentication now has a more detailed V1 scope including display name, forgot password, reset password, JWT-based authentication, refresh token support, and stronger validation rules.
-- The current authentication implementation is still a prototype and does not yet satisfy the new JWT and password-recovery requirements.
+- The authentication implementation now includes signed access tokens, refresh-token rotation endpoints, bcrypt-based password hashing, and frontend token refresh handling, but it still lacks persistent token storage, password-recovery email infrastructure, and full Spring Security middleware.
 - Phase 0 and the opening Phase 1 implementation work have now started in code: the web app has been reshaped into an `app` plus `pages` plus `services` starter structure, and the API now has explicit auth service and structured API error response foundations.
 - The current auth prototype now captures display name during signup, returns display name in session responses, and enforces stronger signup password validation at the API boundary.
+- The web app now includes a designed forgot-password screen in the auth flow, using a placeholder reset-request response until the real email flow is implemented.
+- The authenticated shell now supports page switching between Dashboard and Transactions, and the Transactions page now follows the current wireframe with filters, table view, and add/edit transaction form.
+- The authenticated shell now also includes a Budgets page with progress rows and a Set Budget flow wired to the current budget API shape.
+- The authenticated shell now also includes a Savings Goals page with progress rows and an Add Goal flow wired to the current goal API shape.
+- The authenticated shell now also includes a Reports page with date/account/type filters, category-spend summary, income-vs-expense trend view, and top-category summary derived from current transaction data.
+- The authenticated shell now also includes self-designed Recurring, Accounts, and Settings pages so all planned primary navigation items have a working UI destination.
+- Add Transaction is now implemented as a reusable modal flow from both the global header action and the Transactions page, based on the provided wireframe.
+- The frontend is now being reorganized into page-level and feature-level modules instead of one large screen file, following a more standard SDLC-oriented structure.
+- The web app now uses route-based navigation with dedicated auth routes and `/app/...` workspace routes instead of local page-switch state alone, moving it closer to a protected-shell architecture.
+- A second Spring Boot service now exists as `personal-finance-support-api` to prepare PDF/export and notification capabilities as a separate operational concern from core finance business logic.
+- The web app now proxies support-service requests separately and includes initial UI hooks for PDF export from Reports and a test notification action from Settings.
+- Transfer is visible in the Add Transaction modal UI, but backend support for true two-account transfer posting is still pending.
+
+
+
 
 ## Working Agreement
 
@@ -78,4 +93,8 @@ Last updated: 2026-03-18
 - Should the frontend start with TypeScript immediately or phase it in after the initial feature structure is stable?
 - When production deployment begins, should the first target environment be Azure, AWS, or a lighter platform for early rollout?
 - Should identity stay app-managed for V1, or should Keycloak be introduced before production hardening?
+
+
+
+
 

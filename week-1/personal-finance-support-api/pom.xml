@@ -11,10 +11,10 @@
     </parent>
 
     <groupId>com.finance</groupId>
-    <artifactId>personal-finance-api</artifactId>
+    <artifactId>personal-finance-support-api</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>personal-finance-api</name>
-    <description>Personal Finance Tracker API</description>
+    <name>personal-finance-support-api</name>
+    <description>Support services for notifications and document generation</description>
 
     <properties>
         <java.version>21</java.version>
@@ -31,16 +31,7 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-crypto</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
+            <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -1,6 +1,17 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import DashboardNav from "../components/layout/DashboardNav";
+import AuthCard from "../features/auth/AuthCard";
+import AccountsPage from "../features/accounts/AccountsPage";
+import BudgetsPage from "../features/budgets/BudgetsPage";
+import DashboardPage from "../features/dashboard/DashboardPage";
+import GoalsPage from "../features/goals/GoalsPage";
+import RecurringPage from "../features/recurring/RecurringPage";
+import ReportsPage from "../features/reports/ReportsPage";
+import SettingsPage from "../features/settings/SettingsPage";
+import TransactionModal from "../features/transactions/TransactionModal";
+import TransactionsPage from "../features/transactions/TransactionsPage";
 import {
-  addGoalContribution,
   clearStoredToken,
   createAccount,
   createGoal,
@@ -13,237 +24,92 @@ import {
   getStoredToken,
   login,
   signup,
-  storeToken,
+  storeSessionTokens,
   updateTransaction,
   upsertBudget
 } from "../services/apiClient";
+import { exportReportPdf, sendInAppNotification } from "../services/supportApiClient";
+import {
+  buildRecurringForm,
+  buildTransactionForm,
+  buildTransactionPayload,
+  currentMonth,
+  defaultCategories,
+  today
+} from "../features/workspace/workspaceShared";
 
-const defaultCategories = [
-  "HOUSING",
-  "FOOD",
-  "TRANSPORT",
-  "UTILITIES",
-  "ENTERTAINMENT",
-  "HEALTH",
-  "SAVINGS",
-  "SALARY",
-  "FREELANCE",
-  "OTHER"
-];
+const pageRouteMap = {
+  Dashboard: "/app/dashboard",
+  Transactions: "/app/transactions",
+  Budgets: "/app/budgets",
+  Goals: "/app/goals",
+  Reports: "/app/reports",
+  Recurring: "/app/recurring",
+  Accounts: "/app/accounts",
+  Settings: "/app/settings"
+};
 
-const accountTypes = ["CHECKING", "SAVINGS", "CREDIT_CARD", "CASH", "INVESTMENT"];
-const recurringFrequencies = ["WEEKLY", "MONTHLY", "YEARLY"];
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
+function getCurrentPage(pathname) {
+  const match = Object.entries(pageRouteMap).find(([, route]) => route === pathname);
+  return match?.[0] ?? "Dashboard";
 }
 
-function currentMonth() {
-  return new Date().toISOString().slice(0, 7);
-}
-
-function buildTransactionForm(accountId = "") {
-  return {
-    description: "",
-    amount: "",
-    type: "EXPENSE",
-    category: "FOOD",
-    accountId,
-    transactionDate: today(),
-    recurring: false
-  };
-}
-
-function buildRecurringForm(accountId = "") {
-  return {
-    name: "",
-    amount: "",
-    category: "UTILITIES",
-    accountId,
-    frequency: "MONTHLY",
-    nextDueDate: today()
-  };
-}
-
-function formatCurrency(value) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD"
-  }).format(Number(value ?? 0));
-}
-
-function normalizeTransactionPayload(form) {
-  return {
-    ...form,
-    amount: Number(form.amount),
-    accountId: Number(form.accountId)
-  };
-}
-
-function normalizeRecurringPayload(form) {
-  return {
-    ...form,
-    amount: Number(form.amount),
-    accountId: Number(form.accountId)
-  };
-}
-
-function percent(current, total) {
-  if (!total) {
-    return 0;
+function getAuthMode(pathname) {
+  if (pathname === "/signup") {
+    return "signup";
   }
 
-  return Math.min(100, Math.round((Number(current) / Number(total)) * 100));
-}
-
-function MetricCard({ label, value }) {
-  return (
-    <article className="metric-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
-  );
-}
-function AuthCard({
-  authMode,
-  authForm,
-  onAuthModeChange,
-  onAuthSubmit,
-  onAuthFormChange,
-  onForgotPassword,
-  status
-}) {
-  if (authMode === "login") {
-    return (
-      <section className="auth-card auth-card-login">
-        <h1 className="auth-product-title">Personal Finance Tracker</h1>
-        <div className="auth-divider" />
-        <div className="auth-section-copy">
-          <h2>Welcome back</h2>
-        </div>
-        <form className="auth-form" onSubmit={onAuthSubmit}>
-          <label>
-            Email
-            <input
-              required
-              type="email"
-              value={authForm.email}
-              onChange={(event) => onAuthFormChange("email", event.target.value)}
-            />
-          </label>
-          <label>
-            Password
-            <input
-              required
-              minLength="8"
-              type="password"
-              value={authForm.password}
-              onChange={(event) => onAuthFormChange("password", event.target.value)}
-            />
-          </label>
-          <div className="auth-primary-action">
-            <button type="submit">Log In</button>
-          </div>
-        </form>
-        <div className="auth-links">
-          <button className="text-link-button" onClick={onForgotPassword} type="button">
-            Forgot password?
-          </button>
-          <p className="auth-inline-link">
-            Don&apos;t have an account?{" "}
-            <button className="text-link-button inline" onClick={() => onAuthModeChange("signup")} type="button">
-              Sign up
-            </button>
-          </p>
-        </div>
-        {status ? <p className="status auth-status">{status}</p> : null}
-      </section>
-    );
+  if (pathname === "/forgot-password") {
+    return "forgot";
   }
 
-  return (
-    <section className="auth-card panel">
-      <p className="eyebrow">Week 1 Delivery</p>
-      <h1>Personal Finance Tracker</h1>
-      <p className="hero-copy">
-        Create your secure workspace. I&apos;ll shape the full sign-up screen once you share that page diagram.
-      </p>
-      <div className="auth-toggle">
-        <button className="active" type="button">
-          Sign up
-        </button>
-        <button onClick={() => onAuthModeChange("login")} type="button">
-          Log in
-        </button>
-      </div>
-      <form className="auth-form" onSubmit={onAuthSubmit}>
-        <label>
-          Display name
-          <input
-            required
-            value={authForm.displayName}
-            onChange={(event) => onAuthFormChange("displayName", event.target.value)}
-          />
-        </label>
-        <label>
-          Email
-          <input
-            required
-            type="email"
-            value={authForm.email}
-            onChange={(event) => onAuthFormChange("email", event.target.value)}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            required
-            minLength="8"
-            type="password"
-            value={authForm.password}
-            onChange={(event) => onAuthFormChange("password", event.target.value)}
-          />
-        </label>
-        <button type="submit">Create account</button>
-      </form>
-      {status ? <p className="status">{status}</p> : null}
-    </section>
-  );
+  return "login";
 }
 
-export default function App() {
+export default function WorkspacePage() {
   const [token, setToken] = useState(() => getStoredToken());
   const [user, setUser] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [status, setStatus] = useState("Checking session...");
-  const [authMode, setAuthMode] = useState("login");
   const [authForm, setAuthForm] = useState({ displayName: "", email: "", password: "" });
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [editingTransactionId, setEditingTransactionId] = useState(null);
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [showBudgetComposer, setShowBudgetComposer] = useState(false);
+  const [showGoalComposer, setShowGoalComposer] = useState(false);
+  const [showRecurringComposer, setShowRecurringComposer] = useState(false);
+  const [showAccountComposer, setShowAccountComposer] = useState(false);
+  const [transactionFilters, setTransactionFilters] = useState({ date: "", type: "", category: "", accountId: "", search: "" });
   const [transactionForm, setTransactionForm] = useState(buildTransactionForm());
   const [accountForm, setAccountForm] = useState({ name: "", type: "CHECKING" });
   const [budgetForm, setBudgetForm] = useState({ category: "FOOD", month: currentMonth(), limitAmount: "" });
   const [goalForm, setGoalForm] = useState({ name: "", targetAmount: "", targetDate: today() });
   const [recurringForm, setRecurringForm] = useState(buildRecurringForm());
-  const [goalContribution, setGoalContribution] = useState({});
+
+  const location = useLocation();
+  const navigate = useNavigate();
+  const authMode = getAuthMode(location.pathname);
+  const currentPage = getCurrentPage(location.pathname);
+  const isProtectedRoute = location.pathname.startsWith("/app");
 
   const accounts = dashboard?.accounts ?? [];
   const budgets = dashboard?.budgets ?? [];
   const goals = dashboard?.goals ?? [];
   const recurringPayments = dashboard?.upcomingRecurringPayments ?? [];
-  const topSpendingCategories = dashboard?.topSpendingCategories ?? [];
-  const spendingTrends = dashboard?.spendingTrends ?? [];
+
   const categoryOptions = useMemo(() => {
-    const dynamicCategories = [
-      ...new Set([
-        ...defaultCategories,
-        ...transactions.map((transaction) => transaction.category),
-        ...budgets.map((budget) => budget.category),
-        ...recurringPayments.map((payment) => payment.category)
-      ])
-    ];
-    return dynamicCategories.sort();
+    const values = [...new Set([...defaultCategories, ...transactions.map((transaction) => transaction.category), ...budgets.map((budget) => budget.category), ...recurringPayments.map((payment) => payment.category)])];
+    return values.sort();
   }, [transactions, budgets, recurringPayments]);
+
+  const accountNameById = useMemo(() => new Map(accounts.map((account) => [String(account.id), account.name])), [accounts]);
+
+  useEffect(() => {
+    if (!token && isProtectedRoute) {
+      navigate("/login", { replace: true });
+    }
+  }, [isProtectedRoute, navigate, token]);
 
   async function loadWorkspace(activeToken, { loadingMessage } = {}) {
     if (!activeToken) {
@@ -261,15 +127,16 @@ export default function App() {
         fetchDashboard(activeToken),
         fetchTransactions(activeToken)
       ]);
-
       setUser(sessionData.user);
       setDashboard(dashboardData);
       setTransactions(transactionData);
       setStatus("");
-
       const defaultAccountId = String(dashboardData.accounts?.[0]?.id ?? "");
       setTransactionForm((current) => ({ ...current, accountId: current.accountId || defaultAccountId }));
       setRecurringForm((current) => ({ ...current, accountId: current.accountId || defaultAccountId }));
+      if (!location.pathname.startsWith("/app")) {
+        navigate("/app/dashboard", { replace: true });
+      }
     } catch (error) {
       clearStoredToken();
       setToken("");
@@ -277,6 +144,7 @@ export default function App() {
       setDashboard(null);
       setTransactions([]);
       setStatus(error.message);
+      navigate("/login", { replace: true });
     }
   }
 
@@ -292,43 +160,48 @@ export default function App() {
   async function handleAuthSubmit(event) {
     event.preventDefault();
     setStatus(authMode === "signup" ? "Creating your account..." : "Signing you in...");
-
     try {
-      const response =
-        authMode === "signup" ? await signup(authForm) : await login(authForm);
-      storeToken(response.token);
+      const response = authMode === "signup" ? await signup(authForm) : await login(authForm);
+      storeSessionTokens(response);
       setToken(response.token);
       setUser(response.user);
       setAuthForm({ displayName: "", email: "", password: "" });
+      setForgotPasswordEmail("");
+      navigate("/app/dashboard", { replace: true });
     } catch (error) {
       setStatus(error.message);
     }
   }
 
-  function handleAuthFormChange(field, value) {
-    setAuthForm((current) => ({
-      ...current,
-      [field]: value
-    }));
+  async function handleForgotPasswordSubmit(event) {
+    event.preventDefault();
+    setStatus(`Password reset instructions placeholder sent to ${forgotPasswordEmail}.`);
   }
 
-  function handleForgotPassword() {
-    setStatus("Forgot password flow will be implemented in the next auth phase.");
+  function openAddTransaction() {
+    setEditingTransactionId(null);
+    setTransactionForm(buildTransactionForm(String(accounts[0]?.id ?? "")));
+    setShowTransactionModal(true);
   }
 
   async function handleTransactionSubmit(event) {
     event.preventDefault();
+    if (transactionForm.type === "TRANSFER") {
+      setStatus("Transfer flow will be added with two-account backend support in the next slice.");
+      return;
+    }
+
     const isEditing = Boolean(editingTransactionId);
     setStatus(isEditing ? "Updating transaction..." : "Saving transaction...");
-
     try {
-      const payload = normalizeTransactionPayload(transactionForm);
+      const payload = buildTransactionPayload(transactionForm);
       if (isEditing) {
         await updateTransaction(token, editingTransactionId, payload);
       } else {
         await createTransaction(token, payload);
       }
       setEditingTransactionId(null);
+      setShowTransactionModal(false);
       setTransactionForm(buildTransactionForm(String(accounts[0]?.id ?? "")));
       await loadWorkspace(token, { loadingMessage: "Refreshing your dashboard..." });
       setStatus(isEditing ? "Transaction updated." : "Transaction saved.");
@@ -338,16 +211,19 @@ export default function App() {
   }
 
   function startEditingTransaction(transaction) {
+    navigate("/app/transactions");
     setEditingTransactionId(transaction.id);
     setTransactionForm({
-      description: transaction.description,
-      amount: String(transaction.amount),
       type: transaction.type,
-      category: transaction.category,
-      accountId: String(transaction.accountId),
+      amount: String(transaction.amount),
       transactionDate: transaction.transactionDate,
-      recurring: transaction.recurring
+      accountId: String(transaction.accountId),
+      category: transaction.category,
+      merchant: transaction.description,
+      note: "",
+      tags: ""
     });
+    setShowTransactionModal(true);
     setStatus("Editing transaction.");
   }
 
@@ -357,7 +233,7 @@ export default function App() {
       await deleteTransaction(token, transactionId);
       if (editingTransactionId === transactionId) {
         setEditingTransactionId(null);
-        setTransactionForm(buildTransactionForm(String(accounts[0]?.id ?? "")));
+        setShowTransactionModal(false);
       }
       await loadWorkspace(token, { loadingMessage: "Refreshing your dashboard..." });
       setStatus("Transaction deleted.");
@@ -372,6 +248,7 @@ export default function App() {
     try {
       await createAccount(token, accountForm);
       setAccountForm({ name: "", type: "CHECKING" });
+      setShowAccountComposer(false);
       await loadWorkspace(token, { loadingMessage: "Refreshing accounts..." });
       setStatus("Account created.");
     } catch (error) {
@@ -383,11 +260,9 @@ export default function App() {
     event.preventDefault();
     setStatus("Saving budget...");
     try {
-      await upsertBudget(token, {
-        ...budgetForm,
-        limitAmount: Number(budgetForm.limitAmount)
-      });
+      await upsertBudget(token, { ...budgetForm, limitAmount: Number(budgetForm.limitAmount) });
       setBudgetForm((current) => ({ ...current, limitAmount: "" }));
+      setShowBudgetComposer(false);
       await loadWorkspace(token, { loadingMessage: "Refreshing budgets..." });
       setStatus("Budget updated.");
     } catch (error) {
@@ -399,11 +274,9 @@ export default function App() {
     event.preventDefault();
     setStatus("Creating savings goal...");
     try {
-      await createGoal(token, {
-        ...goalForm,
-        targetAmount: Number(goalForm.targetAmount)
-      });
+      await createGoal(token, { ...goalForm, targetAmount: Number(goalForm.targetAmount) });
       setGoalForm({ name: "", targetAmount: "", targetDate: today() });
+      setShowGoalComposer(false);
       await loadWorkspace(token, { loadingMessage: "Refreshing goals..." });
       setStatus("Savings goal created.");
     } catch (error) {
@@ -411,19 +284,43 @@ export default function App() {
     }
   }
 
-  async function handleGoalContribution(goalId) {
-    const contributionAmount = Number(goalContribution[goalId]);
-    if (!contributionAmount) {
-      setStatus("Enter a contribution amount first.");
-      return;
-    }
-
-    setStatus("Updating goal progress...");
+  async function handleExportPdf(filters) {
+    setStatus("Preparing PDF export...");
     try {
-      await addGoalContribution(token, goalId, { contributionAmount });
-      setGoalContribution((current) => ({ ...current, [goalId]: "" }));
-      await loadWorkspace(token, { loadingMessage: "Refreshing goals..." });
-      setStatus("Goal progress updated.");
+      const blob = await exportReportPdf({
+        userId: String(user?.id ?? user?.email ?? "demo-user"),
+        reportName: `Finance Report ${filters.dateRange}`,
+        rows: filters.rows.map((transaction) => ({
+          date: transaction.transactionDate,
+          type: transaction.type,
+          category: transaction.category,
+          amount: transaction.amount,
+          accountId: transaction.accountId,
+          description: transaction.description
+        }))
+      });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "finance-report-preview.pdf";
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+      setStatus("PDF export prepared from support service.");
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function handleSendTestNotification() {
+    setStatus("Sending test notification...");
+    try {
+      await sendInAppNotification({
+        userId: String(user?.id ?? user?.email ?? "demo-user"),
+        channel: "IN_APP",
+        title: "Finance Tracker test notification",
+        message: "This is a support-service notification preview for your showcase build."
+      });
+      setStatus("Test notification accepted by support service.");
     } catch (error) {
       setStatus(error.message);
     }
@@ -433,8 +330,9 @@ export default function App() {
     event.preventDefault();
     setStatus("Creating recurring payment...");
     try {
-      await createRecurringPayment(token, normalizeRecurringPayload(recurringForm));
+      await createRecurringPayment(token, { ...recurringForm, amount: Number(recurringForm.amount), accountId: Number(recurringForm.accountId) });
       setRecurringForm(buildRecurringForm(String(accounts[0]?.id ?? "")));
+      setShowRecurringComposer(false);
       await loadWorkspace(token, { loadingMessage: "Refreshing recurring payments..." });
       setStatus("Recurring payment created.");
     } catch (error) {
@@ -449,9 +347,15 @@ export default function App() {
     setDashboard(null);
     setTransactions([]);
     setEditingTransactionId(null);
+    setShowTransactionModal(false);
+    setShowBudgetComposer(false);
+    setShowGoalComposer(false);
+    setShowRecurringComposer(false);
+    setShowAccountComposer(false);
     setTransactionForm(buildTransactionForm());
     setRecurringForm(buildRecurringForm());
     setStatus("Signed out.");
+    navigate("/login", { replace: true });
   }
 
   if (!user) {
@@ -460,10 +364,12 @@ export default function App() {
         <AuthCard
           authForm={authForm}
           authMode={authMode}
-          onAuthFormChange={handleAuthFormChange}
-          onAuthModeChange={setAuthMode}
+          forgotPasswordEmail={forgotPasswordEmail}
+          onAuthFormChange={(field, value) => setAuthForm((current) => ({ ...current, [field]: value }))}
+          onAuthModeChange={(mode) => navigate(mode === "signup" ? "/signup" : mode === "forgot" ? "/forgot-password" : "/login")}
           onAuthSubmit={handleAuthSubmit}
-          onForgotPassword={handleForgotPassword}
+          onForgotPasswordChange={setForgotPasswordEmail}
+          onForgotPasswordSubmit={handleForgotPasswordSubmit}
           status={status}
         />
       </div>
@@ -471,477 +377,18 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">Week 1 Delivery</p>
-          <h1>Personal Finance Tracker</h1>
-          <p className="hero-copy">
-            Signed in as {user.displayName || user.email}. Manage transactions, budgets, reporting, goals, and recurring bills in one place.
-          </p>
-        </div>
-        <div className="hero-actions">
-          <div className="hero-card">
-            <span>Net savings</span>
-            <strong>{formatCurrency(dashboard?.snapshot?.netSavings)}</strong>
-          </div>
-          <button className="secondary-button" onClick={handleLogout} type="button">
-            Log out
-          </button>
-        </div>
-      </header>
-
-      {status ? <p className="status">{status}</p> : null}
-
-      <main className="grid">
-        <section className="panel summary-grid full-width">
-          <MetricCard label="Income" value={formatCurrency(dashboard?.snapshot?.totalIncome)} />
-          <MetricCard label="Expenses" value={formatCurrency(dashboard?.snapshot?.totalExpenses)} />
-          <MetricCard label="Accounts" value={String(accounts.length)} />
-          <MetricCard label="Goals" value={String(goals.length)} />
-        </section>
-
-        <section className="panel full-width">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Transactions</p>
-              <h2>{editingTransactionId ? "Edit transaction" : "Add transaction"}</h2>
-            </div>
-          </div>
-          <form className="form-grid" onSubmit={handleTransactionSubmit}>
-            <label>
-              Description
-              <input
-                required
-                value={transactionForm.description}
-                onChange={(event) => setTransactionForm({ ...transactionForm, description: event.target.value })}
-              />
-            </label>
-            <label>
-              Amount
-              <input
-                required
-                min="0.01"
-                step="0.01"
-                type="number"
-                value={transactionForm.amount}
-                onChange={(event) => setTransactionForm({ ...transactionForm, amount: event.target.value })}
-              />
-            </label>
-            <label>
-              Type
-              <select
-                value={transactionForm.type}
-                onChange={(event) => setTransactionForm({ ...transactionForm, type: event.target.value })}
-              >
-                <option value="EXPENSE">Expense</option>
-                <option value="INCOME">Income</option>
-              </select>
-            </label>
-            <label>
-              Category
-              <select
-                value={transactionForm.category}
-                onChange={(event) => setTransactionForm({ ...transactionForm, category: event.target.value })}
-              >
-                {categoryOptions.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Account
-              <select
-                required
-                value={transactionForm.accountId}
-                onChange={(event) => setTransactionForm({ ...transactionForm, accountId: event.target.value })}
-              >
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Date
-              <input
-                required
-                type="date"
-                value={transactionForm.transactionDate}
-                onChange={(event) => setTransactionForm({ ...transactionForm, transactionDate: event.target.value })}
-              />
-            </label>
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={transactionForm.recurring}
-                onChange={(event) => setTransactionForm({ ...transactionForm, recurring: event.target.checked })}
-              />
-              Mark as recurring expense
-            </label>
-            <div className="button-row">
-              <button type="submit">{editingTransactionId ? "Update" : "Save"} transaction</button>
-              {editingTransactionId ? (
-                <button
-                  className="secondary-button"
-                  onClick={() => {
-                    setEditingTransactionId(null);
-                    setTransactionForm(buildTransactionForm(String(accounts[0]?.id ?? "")));
-                  }}
-                  type="button"
-                >
-                  Cancel edit
-                </button>
-              ) : null}
-            </div>
-          </form>
-        </section>
-
-        <section className="panel">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Accounts</p>
-              <h2>Add account</h2>
-            </div>
-          </div>
-          <form className="form-grid compact-form" onSubmit={handleCreateAccount}>
-            <label>
-              Account name
-              <input
-                required
-                value={accountForm.name}
-                onChange={(event) => setAccountForm({ ...accountForm, name: event.target.value })}
-              />
-            </label>
-            <label>
-              Type
-              <select
-                value={accountForm.type}
-                onChange={(event) => setAccountForm({ ...accountForm, type: event.target.value })}
-              >
-                {accountTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="submit">Create account</button>
-          </form>
-          <div className="stack-list">
-            {accounts.map((account) => (
-              <div className="row" key={account.id}>
-                <span>{account.name}</span>
-                <strong>{account.type}</strong>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Budgeting</p>
-              <h2>Monthly budgets</h2>
-            </div>
-          </div>
-          <form className="form-grid compact-form" onSubmit={handleBudgetSubmit}>
-            <label>
-              Category
-              <select
-                value={budgetForm.category}
-                onChange={(event) => setBudgetForm({ ...budgetForm, category: event.target.value })}
-              >
-                {categoryOptions.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Month
-              <input
-                required
-                type="month"
-                value={budgetForm.month}
-                onChange={(event) => setBudgetForm({ ...budgetForm, month: event.target.value })}
-              />
-            </label>
-            <label>
-              Limit
-              <input
-                required
-                min="0.01"
-                step="0.01"
-                type="number"
-                value={budgetForm.limitAmount}
-                onChange={(event) => setBudgetForm({ ...budgetForm, limitAmount: event.target.value })}
-              />
-            </label>
-            <button type="submit">Save budget</button>
-          </form>
-          <div className="stack-list">
-            {budgets.map((budget) => (
-              <div className="budget-card" key={budget.id}>
-                <div className="row no-border">
-                  <strong>{budget.category}</strong>
-                  <span className={budget.status === "OVER" ? "negative" : "positive"}>{budget.status}</span>
-                </div>
-                <p>{formatCurrency(budget.actualAmount)} of {formatCurrency(budget.limitAmount)} used</p>
-                <div className="progress-track">
-                  <div
-                    className={budget.status === "OVER" ? "progress-fill over" : "progress-fill"}
-                    style={{ width: `${percent(budget.actualAmount, budget.limitAmount)}%` }}
-                  />
-                </div>
-                <small>Remaining: {formatCurrency(budget.remainingAmount)}</small>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Reporting</p>
-              <h2>Spending trends</h2>
-            </div>
-          </div>
-          <div className="chart-list">
-            {spendingTrends.map((trend) => (
-              <div className="chart-row" key={trend.month}>
-                <span>{trend.month}</span>
-                <div className="chart-bar">
-                  <div
-                    className="chart-fill"
-                    style={{ width: `${percent(trend.amount, dashboard?.snapshot?.totalExpenses || 1)}%` }}
-                  />
-                </div>
-                <strong>{formatCurrency(trend.amount)}</strong>
-              </div>
-            ))}
-          </div>
-          <h3>Top spending categories</h3>
-          <div className="stack-list">
-            {topSpendingCategories.map((item) => (
-              <div className="row" key={item.category}>
-                <span>{item.category}</span>
-                <strong>{formatCurrency(item.amount)}</strong>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Savings goals</p>
-              <h2>Create and track goals</h2>
-            </div>
-          </div>
-          <form className="form-grid compact-form" onSubmit={handleGoalSubmit}>
-            <label>
-              Goal name
-              <input
-                required
-                value={goalForm.name}
-                onChange={(event) => setGoalForm({ ...goalForm, name: event.target.value })}
-              />
-            </label>
-            <label>
-              Target amount
-              <input
-                required
-                min="0.01"
-                step="0.01"
-                type="number"
-                value={goalForm.targetAmount}
-                onChange={(event) => setGoalForm({ ...goalForm, targetAmount: event.target.value })}
-              />
-            </label>
-            <label>
-              Deadline
-              <input
-                required
-                type="date"
-                value={goalForm.targetDate}
-                onChange={(event) => setGoalForm({ ...goalForm, targetDate: event.target.value })}
-              />
-            </label>
-            <button type="submit">Create goal</button>
-          </form>
-          <div className="stack-list">
-            {goals.map((goal) => (
-              <div className="goal-card" key={goal.id}>
-                <div className="row no-border">
-                  <strong>{goal.name}</strong>
-                  <span>{goal.targetDate}</span>
-                </div>
-                <p>{formatCurrency(goal.currentAmount)} of {formatCurrency(goal.targetAmount)} saved</p>
-                <div className="progress-track">
-                  <div className="progress-fill" style={{ width: `${percent(goal.currentAmount, goal.targetAmount)}%` }} />
-                </div>
-                <div className="inline-form">
-                  <input
-                    min="0.01"
-                    placeholder="Contribution"
-                    step="0.01"
-                    type="number"
-                    value={goalContribution[goal.id] ?? ""}
-                    onChange={(event) =>
-                      setGoalContribution((current) => ({
-                        ...current,
-                        [goal.id]: event.target.value
-                      }))
-                    }
-                  />
-                  <button onClick={() => handleGoalContribution(goal.id)} type="button">
-                    Add progress
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Recurring</p>
-              <h2>Bills and subscriptions</h2>
-            </div>
-          </div>
-          <form className="form-grid compact-form" onSubmit={handleRecurringSubmit}>
-            <label>
-              Name
-              <input
-                required
-                value={recurringForm.name}
-                onChange={(event) => setRecurringForm({ ...recurringForm, name: event.target.value })}
-              />
-            </label>
-            <label>
-              Amount
-              <input
-                required
-                min="0.01"
-                step="0.01"
-                type="number"
-                value={recurringForm.amount}
-                onChange={(event) => setRecurringForm({ ...recurringForm, amount: event.target.value })}
-              />
-            </label>
-            <label>
-              Category
-              <select
-                value={recurringForm.category}
-                onChange={(event) => setRecurringForm({ ...recurringForm, category: event.target.value })}
-              >
-                {categoryOptions.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Account
-              <select
-                value={recurringForm.accountId}
-                onChange={(event) => setRecurringForm({ ...recurringForm, accountId: event.target.value })}
-              >
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Frequency
-              <select
-                value={recurringForm.frequency}
-                onChange={(event) => setRecurringForm({ ...recurringForm, frequency: event.target.value })}
-              >
-                {recurringFrequencies.map((frequency) => (
-                  <option key={frequency} value={frequency}>
-                    {frequency}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Next due date
-              <input
-                required
-                type="date"
-                value={recurringForm.nextDueDate}
-                onChange={(event) => setRecurringForm({ ...recurringForm, nextDueDate: event.target.value })}
-              />
-            </label>
-            <button type="submit">Add recurring payment</button>
-          </form>
-          <div className="stack-list">
-            {recurringPayments.map((payment) => (
-              <div className="row" key={payment.id}>
-                <div>
-                  <strong>{payment.name}</strong>
-                  <p>{payment.category} · {payment.frequency} · {payment.accountName}</p>
-                </div>
-                <div className="align-right">
-                  <strong>{formatCurrency(payment.amount)}</strong>
-                  <p>{payment.nextDueDate}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="panel full-width">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">History</p>
-              <h2>All transactions</h2>
-            </div>
-          </div>
-          <div className="table">
-            <div className="table-head">
-              <span>Description</span>
-              <span>Category</span>
-              <span>Account</span>
-              <span>Date</span>
-              <span>Amount</span>
-              <span>Actions</span>
-            </div>
-            {transactions.map((transaction) => (
-              <div className="table-row" key={transaction.id}>
-                <span>{transaction.description}</span>
-                <span>{transaction.category}</span>
-                <span>{transaction.accountName}</span>
-                <span>{transaction.transactionDate}</span>
-                <span className={transaction.type === "INCOME" ? "positive" : "negative"}>
-                  {transaction.type === "INCOME" ? "+" : "-"}
-                  {formatCurrency(transaction.amount)}
-                </span>
-                <div className="action-row">
-                  <button onClick={() => startEditingTransaction(transaction)} type="button">Edit</button>
-                  <button className="danger-button" onClick={() => handleDeleteTransaction(transaction.id)} type="button">
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </main>
+    <div className="app-shell dashboard-shell">
+      <DashboardNav currentPage={currentPage} onLogout={handleLogout} onNavigate={(page) => navigate(pageRouteMap[page] || "/app/dashboard")} onOpenAddTransaction={openAddTransaction} user={user} />
+      {status ? <p className="status dashboard-status">{status}</p> : null}
+      {currentPage === "Dashboard" ? <DashboardPage dashboard={dashboard} goals={goals} recurringPayments={recurringPayments} transactions={transactions} /> : null}
+      {currentPage === "Transactions" ? <TransactionsPage accountNameById={accountNameById} accounts={accounts} categoryOptions={categoryOptions} onDeleteTransaction={handleDeleteTransaction} onOpenAddTransaction={openAddTransaction} onStartEditingTransaction={startEditingTransaction} onTransactionFilterChange={(field, value) => setTransactionFilters((current) => ({ ...current, [field]: value }))} transactionFilters={transactionFilters} transactions={transactions} /> : null}
+      {currentPage === "Budgets" ? <BudgetsPage budgetForm={budgetForm} budgets={budgets} categoryOptions={categoryOptions} onBudgetFormChange={(field, value) => setBudgetForm((current) => ({ ...current, [field]: value }))} onBudgetSubmit={handleBudgetSubmit} setShowBudgetComposer={setShowBudgetComposer} showBudgetComposer={showBudgetComposer} /> : null}
+      {currentPage === "Goals" ? <GoalsPage goalForm={goalForm} goals={goals} onGoalFormChange={(field, value) => setGoalForm((current) => ({ ...current, [field]: value }))} onGoalSubmit={handleGoalSubmit} setShowGoalComposer={setShowGoalComposer} showGoalComposer={showGoalComposer} /> : null}
+      {currentPage === "Reports" ? <ReportsPage accounts={accounts} onExportPdf={handleExportPdf} transactions={transactions} /> : null}
+      {currentPage === "Recurring" ? <RecurringPage onRecurringFormChange={(field, value) => setRecurringForm((current) => ({ ...current, [field]: value }))} onRecurringSubmit={handleRecurringSubmit} recurringForm={recurringForm} recurringPayments={recurringPayments} setShowRecurringComposer={setShowRecurringComposer} showRecurringComposer={showRecurringComposer} /> : null}
+      {currentPage === "Accounts" ? <AccountsPage accountForm={accountForm} accounts={accounts} onAccountFormChange={(field, value) => setAccountForm((current) => ({ ...current, [field]: value }))} onCreateAccount={handleCreateAccount} setShowAccountComposer={setShowAccountComposer} showAccountComposer={showAccountComposer} /> : null}
+      {currentPage === "Settings" ? <SettingsPage onLogout={handleLogout} onSendTestNotification={handleSendTestNotification} user={user} /> : null}
+      {showTransactionModal ? <TransactionModal accounts={accounts} categoryOptions={categoryOptions} editingTransactionId={editingTransactionId} onCancel={() => setShowTransactionModal(false)} onChange={(field, value) => setTransactionForm((current) => ({ ...current, [field]: value }))} onSubmit={handleTransactionSubmit} transactionForm={transactionForm} /> : null}
     </div>
   );
 }
-
-
-
-
