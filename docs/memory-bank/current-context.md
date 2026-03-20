@@ -40,6 +40,8 @@ Last updated: 2026-03-18
 - The global authenticated shell should also support secondary utilities: Add Transaction, Search, Date Range Picker, Notifications, and User Profile Menu.
 - Authentication now has a more detailed V1 scope including display name, forgot password, reset password, JWT-based authentication, refresh token support, and stronger validation rules.
 - The current authentication implementation is still a prototype and does not yet satisfy the new JWT and password-recovery requirements.
+- Phase 0 and the opening Phase 1 implementation work have now started in code: the web app has been reshaped into an `app` plus `pages` plus `services` starter structure, and the API now has explicit auth service and structured API error response foundations.
+- The current auth prototype now captures display name during signup, returns display name in session responses, and enforces stronger signup password validation at the API boundary.
 
 ## Working Agreement
 
@@ -76,3 +78,4 @@ Last updated: 2026-03-18
 - Should the frontend start with TypeScript immediately or phase it in after the initial feature structure is stable?
 - When production deployment begins, should the first target environment be Azure, AWS, or a lighter platform for early rollout?
 - Should identity stay app-managed for V1, or should Keycloak be introduced before production hardening?
+

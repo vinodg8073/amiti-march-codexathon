@@ -51,7 +51,7 @@ public class FinanceWorkspaceService {
         }
 
         long userId = userIdSequence.getAndIncrement();
-        UserRecord userRecord = new UserRecord(userId, email, request.password());
+        UserRecord userRecord = new UserRecord(userId, email, request.password(), request.displayName().trim());
         usersByEmail.put(email, userRecord);
         workspacesByUserId.put(userId, seedWorkspace());
 
@@ -71,7 +71,7 @@ public class FinanceWorkspaceService {
     public synchronized AuthResponse getSession(String authorizationHeader) {
         UserRecord userRecord = requireUser(authorizationHeader);
         String token = extractToken(authorizationHeader);
-        return new AuthResponse(token, new UserView(userRecord.id(), userRecord.email()));
+        return new AuthResponse(token, new UserView(userRecord.id(), userRecord.email(), userRecord.displayName()));
     }
 
     public synchronized List<Account> getAccounts(String authorizationHeader) {
@@ -294,7 +294,7 @@ public class FinanceWorkspaceService {
     private AuthResponse createSession(UserRecord userRecord) {
         String token = UUID.randomUUID().toString();
         sessionsByToken.put(token, userRecord.id());
-        return new AuthResponse(token, new UserView(userRecord.id(), userRecord.email()));
+        return new AuthResponse(token, new UserView(userRecord.id(), userRecord.email(), userRecord.displayName()));
     }
 
     private UserRecord requireUser(String authorizationHeader) {
@@ -464,7 +464,7 @@ public class FinanceWorkspaceService {
         return workspace;
     }
 
-    private record UserRecord(Long id, String email, String password) {
+    private record UserRecord(Long id, String email, String password, String displayName) {
     }
 
     private static final class UserWorkspace {
@@ -480,3 +480,4 @@ public class FinanceWorkspaceService {
         private final List<RecurringPayment> recurringPayments = new ArrayList<>();
     }
 }
+
